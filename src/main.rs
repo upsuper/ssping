@@ -146,7 +146,12 @@ async fn send_request(
         .await
         .map_err(|_| "Failed to start HTTP connection")?;
     tokio::spawn(connection.map(|_| ()));
-    let mut request = hyper::Request::get(url);
+    let mut request = hyper::Request::get(url)
+        .header(
+            "User-Agent",
+            concat!(env!("CARGO_BIN_NAME"), "/", env!("CARGO_PKG_VERSION")),
+        )
+        .header("Accept", "*/*");
     if let Address::DomainNameAddress(domain, _) = addr {
         request = request.header("Host", domain);
     }
