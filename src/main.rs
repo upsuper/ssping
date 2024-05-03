@@ -84,8 +84,8 @@ async fn ping_loop(opts: &Opts, counts: &mut Counts) -> Result<(), Error> {
         .url
         .as_deref()
         .unwrap_or("http://www.google.com/generate_204");
-    let origin = Url::parse(url).context("Invalid test URL")?.origin();
-    let addr = match origin {
+    let url = Url::parse(url).context("Invalid test URL")?;
+    let addr = match url.origin() {
         Origin::Opaque(_) => unreachable!("Unexpected opaque origin"),
         Origin::Tuple(scheme, host, port) => {
             if scheme != "http" {
@@ -108,7 +108,7 @@ async fn ping_loop(opts: &Opts, counts: &mut Counts) -> Result<(), Error> {
             tokio::time::sleep(interval).await;
         }
         let start = Instant::now();
-        let result = send_request(context.clone(), &config, &addr, url).await;
+        let result = send_request(context.clone(), &config, &addr, &url).await;
         let duration = start.elapsed();
         counts.total += 1;
         match result {
@@ -137,7 +137,7 @@ async fn send_request(
     context: SharedContext,
     config: &ServerConfig,
     addr: &Address,
-    url: &str,
+    url: &Url,
 ) -> Result<StatusCode, &'static str> {
     let proxy = ProxyClientStream::connect(context, config, addr)
         .await
@@ -146,7 +146,7 @@ async fn send_request(
         .await
         .map_err(|_| "Failed to start HTTP connection")?;
     tokio::spawn(connection.map(|_| ()));
-    let mut request = hyper::Request::get(url)
+    let mut request = hyper::Request::get(url.path())
         .header(
             "User-Agent",
             concat!(env!("CARGO_BIN_NAME"), "/", env!("CARGO_PKG_VERSION")),
