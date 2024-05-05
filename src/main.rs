@@ -30,6 +30,9 @@ struct Opts {
     /// Interval in seconds between each probe.
     #[arg(short, default_value_t = 1f32)]
     interval: f32,
+    /// Time to wait for a response, in seconds. 0 means infinite timeout.
+    #[arg(short = 'W', default_value_t = 0f32)]
+    timeout: f32,
 }
 
 #[tokio::main]
@@ -78,6 +81,7 @@ struct Counts {
 async fn ping_loop(opts: &Opts, counts: &mut Counts) -> Result<(), Error> {
     let config = ServerConfig::from_url(&opts.ss_url).context("Failed to parse Shadowsocks URL")?;
     let interval = Duration::from_millis((opts.interval * 1000.) as u64);
+    let timeout = (opts.timeout > 0.).then(|| Duration::from_millis((opts.timeout * 1000.) as u64));
     let context = shadowsocks::context::Context::new_shared(ServerType::Local);
     let url = opts
         .url
@@ -107,7 +111,13 @@ async fn ping_loop(opts: &Opts, counts: &mut Counts) -> Result<(), Error> {
             tokio::time::sleep(interval).await;
         }
         let start = Instant::now();
-        let result = send_request(context.clone(), &config, &addr, &url).await;
+        let request_future = send_request(context.clone(), &config, &addr, &url);
+        let result = match timeout {
+            Some(duration) => tokio::time::timeout(duration, request_future)
+                .await
+                .unwrap_or(Err("Timeout")),
+            None => request_future.await,
+        };
         let duration = start.elapsed();
         counts.total += 1;
         match result {
