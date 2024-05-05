@@ -25,10 +25,10 @@ struct Opts {
     #[arg(long, short)]
     url: Option<String>,
     /// Stop after n probes. By default, no limit will be applied.
-    #[arg(long, short)]
+    #[arg(short)]
     count: Option<u64>,
     /// Interval in seconds between each probe.
-    #[arg(long, short, default_value_t = 1f32)]
+    #[arg(short, default_value_t = 1f32)]
     interval: f32,
 }
 
