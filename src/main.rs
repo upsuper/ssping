@@ -1,6 +1,5 @@
 use anyhow::{bail, Context as _, Error};
 use clap::Parser as _;
-use futures_util::{pin_mut, FutureExt};
 use hyper::body::Bytes;
 use hyper::client::conn::http1;
 use hyper::StatusCode;
@@ -39,11 +38,11 @@ async fn main() -> ExitCode {
     let mut counts = Counts::default();
     let start = Instant::now();
     let result = {
-        let main_future = ping_loop(&opts, &mut counts).fuse();
-        let signal_future = tokio::signal::ctrl_c().fuse();
-        pin_mut!(main_future);
-        pin_mut!(signal_future);
-        futures_util::select! {
+        let main_future = ping_loop(&opts, &mut counts);
+        let signal_future = tokio::signal::ctrl_c();
+        tokio::pin!(main_future);
+        tokio::pin!(signal_future);
+        tokio::select! {
             main_res = main_future => main_res,
             signal_res = signal_future => signal_res.context("Failed to listen for event"),
         }
@@ -145,7 +144,9 @@ async fn send_request(
     let (mut request_sender, connection) = http1::handshake(TokioIo::new(proxy))
         .await
         .map_err(|_| "Failed to start HTTP connection")?;
-    tokio::spawn(connection.map(|_| ()));
+    tokio::spawn(async move {
+        let _ = connection.await;
+    });
     let mut request = hyper::Request::get(url.path())
         .header(
             "User-Agent",
