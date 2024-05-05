@@ -1,3 +1,5 @@
+mod non_negative;
+
 use anyhow::{bail, Context as _, Error};
 use clap::Parser as _;
 use hyper::body::Bytes;
@@ -12,6 +14,8 @@ use std::net::{IpAddr, SocketAddr};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 use url::{Host, Origin, Url};
+
+use crate::non_negative::NonNegativeF32;
 
 #[derive(clap::Parser, Debug)]
 #[command(about = "Command-line tool for testing connectivity of Shadowsocks server.")]
@@ -28,11 +32,11 @@ struct Opts {
     #[arg(short)]
     count: Option<u64>,
     /// Interval in seconds between each probe.
-    #[arg(short, default_value_t = 1f32)]
-    interval: f32,
+    #[arg(short, default_value_t = NonNegativeF32::from(1f32))]
+    interval: NonNegativeF32,
     /// Time to wait for a response, in seconds. 0 means infinite timeout.
-    #[arg(short = 'W', default_value_t = 0f32)]
-    timeout: f32,
+    #[arg(short = 'W', default_value_t = NonNegativeF32::from(0f32))]
+    timeout: NonNegativeF32,
 }
 
 #[tokio::main]
@@ -80,8 +84,9 @@ struct Counts {
 
 async fn ping_loop(opts: &Opts, counts: &mut Counts) -> Result<(), Error> {
     let config = ServerConfig::from_url(&opts.ss_url).context("Failed to parse Shadowsocks URL")?;
-    let interval = Duration::from_millis((opts.interval * 1000.) as u64);
-    let timeout = (opts.timeout > 0.).then(|| Duration::from_millis((opts.timeout * 1000.) as u64));
+    let interval = Duration::from_millis((f32::from(opts.interval) * 1000.) as u64);
+    let timeout = f32::from(opts.timeout);
+    let timeout = (timeout > 0.).then(|| Duration::from_millis((timeout * 1000.) as u64));
     let context = shadowsocks::context::Context::new_shared(ServerType::Local);
     let url = opts
         .url
