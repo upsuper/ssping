@@ -21,7 +21,7 @@ struct Opts {
     /// URL used to test through the Shadowsocks proxy.
     ///
     /// By default, http://www.google.com/generate_204 is used.
-    /// Any URL that normally returns a successful HTTP status code (200~299) should work.
+    /// Any HTTP address that normally returns a successful status code (200~299) should work.
     #[arg(long, short)]
     url: Option<String>,
     /// Stop after n probes. By default, no limit will be applied.
